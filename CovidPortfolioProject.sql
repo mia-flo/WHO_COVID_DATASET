@@ -2,17 +2,28 @@ SELECT *
 FROM COVIDPortfolioProject..CovidDeaths
 WHERE continent IS NOT NULL
 
+--global numbers
+SELECT
+	SUM(CAST(total_cases AS DECIMAL(15,0))) AS totalCases
+	,SUM(CAST(total_deaths AS DECIMAL(15,0))) AS totalDeaths
+	,(SUM(CAST(total_deaths AS DECIMAL(15,0)))/SUM(CAST(total_cases AS DECIMAL(15,0))))*100
+		AS percentDeaths
+FROM COVIDPortfolioProject..CovidDeaths
+WHERE continent IS NOT NULL
+
+
 --percent deaths
 --likelihood of dying if contracted COVID
 SELECT
 	location
 	,date
-	,total_cases
-	,total_deaths
+	,SUM(total_cases) AS total_cases
+	,SUM(total_deaths) AS total_deaths
 	,CAST((total_deaths / CAST(total_cases AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))
 		AS percent_deaths
 FROM COVIDPortfolioProject..CovidDeaths
 WHERE total_cases > 0 AND total_deaths > 0
+GROUP BY location, date, total_cases, total_deaths
 
 
 --total cases vs population
@@ -27,7 +38,7 @@ FROM COVIDPortfolioProject..CovidDeaths
 WHERE total_cases >0 AND population > 0
 
 
---countries w/ the highest infection rate
+--highest infection rates
 SELECT 
 	location
 	,MAX(total_cases) AS highest_infection_count
@@ -200,19 +211,67 @@ ORDER BY diabetes_prevalence DESC, femaleSmokers DESC, maleSmokers DESC
 
 
 --which countries have the highest rate of vaccination?
-SELECT
-	location
-	,date
-	,CAST(total_vaccinations AS DECIMAL(15,0)) totalVac
-	,CAST(people_vaccinated AS DECIMAL(15,0)) peopleVac
-	,CAST(people_fully_vaccinated AS DECIMAL(15,0)) fullVac
-	,CAST(total_boosters AS DECIMAL(15,0)) boosters
-FROM COVIDPortfolioProject..CovidVaccinations
-WHERE CAST(total_vaccinations AS DECIMAL(15,0)) > 0
-	AND CAST(people_vaccinated AS DECIMAL(15,0)) > 0
-	AND CAST(people_fully_vaccinated AS DECIMAL(15,0)) > 0
-	AND CAST(total_boosters AS DECIMAL(15,0)) > 0
-	AND continent IS NOT NULL
-GROUP BY location, date, total_vaccinations, people_vaccinated, people_fully_vaccinated, total_boosters
+--SELECT
+--	location
+--	,date
+--	,CAST(total_vaccinations AS DECIMAL(15,0)) totalVac
+--	,CAST(people_vaccinated AS DECIMAL(15,0)) peopleVac
+--	,CAST(people_fully_vaccinated AS DECIMAL(15,0)) fullVac
+--	,CAST(total_boosters AS DECIMAL(15,0)) boosters
+--FROM COVIDPortfolioProject..CovidVaccinations
+--WHERE CAST(total_vaccinations AS DECIMAL(15,0)) > 0
+--	AND CAST(people_vaccinated AS DECIMAL(15,0)) > 0
+--	AND CAST(people_fully_vaccinated AS DECIMAL(15,0)) > 0
+--	AND CAST(total_boosters AS DECIMAL(15,0)) > 0
+--	AND continent IS NOT NULL
+--GROUP BY location, date, total_vaccinations, people_vaccinated, people_fully_vaccinated, total_boosters
 
+
+--
+--SELECT
+--	location
+--	,SUM(CAST(total_vaccinations AS DECIMAL(15,0))) totalVac
+--	,SUM(CAST(people_vaccinated AS DECIMAL(15,0))) peopleVac
+--	,SUM(CAST(people_fully_vaccinated AS DECIMAL(15,0))) fullVac
+--	,SUM(CAST(total_boosters AS DECIMAL(15,0))) boosters
+--FROM COVIDPortfolioProject..CovidVaccinations
+--WHERE CAST(total_vaccinations AS DECIMAL(15,0)) > 0
+--	AND CAST(people_vaccinated AS DECIMAL(15,0)) > 0
+--	AND CAST(people_fully_vaccinated AS DECIMAL(15,0)) > 0
+--	AND CAST(total_boosters AS DECIMAL(15,0)) > 0
+--	AND continent IS NOT NULL
+--GROUP BY location
+
+
+--hospitalizations by month, for each yr
+
+WITH monthly (location, mo) AS
+		(SELECT
+			location
+			,MONTH(date) mo
+		FROM CovidDeaths
+		WHERE YEAR(date) = 2020
+		),
+	admissions (location, icu) AS
+		(SELECT
+			location
+			,CAST(icu_patients AS INT) AS icu
+		FROM CovidDeaths
+		),
+	total_admisions_over_time (location, total_icu) AS
+		(SELECT
+			c.location
+			,SUM(a.icu) 
+				OVER (PARTITION BY m.mo) AS total_icu
+		FROM CovidDeaths c
+		JOIN monthly m 
+			ON (c.location = m.location)
+		JOIN admissions a
+			ON (m.location = a.location)
+		)
+SELECT 
+	ta.location
+	,total_icu
+FROM total_admisions_over_time ta
+GROUP BY location, total_icu
 
