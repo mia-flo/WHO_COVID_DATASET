@@ -12,30 +12,16 @@ FROM COVIDPortfolioProject..CovidDeaths
 WHERE continent IS NOT NULL
 
 
---percent deaths
---likelihood of dying if contracted COVID
-SELECT
+--death counts by continent
+SELECT 
 	location
-	,date
-	,SUM(total_cases) AS total_cases
-	,SUM(total_deaths) AS total_deaths
-	,CAST((total_deaths / CAST(total_cases AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))
-		AS percent_deaths
+	,SUM(new_cases) AS total_death_count
 FROM COVIDPortfolioProject..CovidDeaths
-WHERE total_cases > 0 AND total_deaths > 0
-GROUP BY location, date, total_cases, total_deaths
-
-
---total cases vs population
---percentage of population who contracted COVID
-SELECT
-	location
-	,date
-	,total_cases
-	,population
-	,CAST((total_Cases / CAST(population AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2)) AS percent_contracted
-FROM COVIDPortfolioProject..CovidDeaths
-WHERE total_cases >0 AND population > 0
+WHERE new_cases > 0
+	AND continent IS NULL
+	AND location NOT IN ('World', 'Europian Union', 'International')
+GROUP BY location
+ORDER BY total_death_count DESC
 
 
 --highest infection rates
@@ -43,66 +29,81 @@ SELECT
 	location
 	,MAX(total_cases) AS highest_infection_count
 	,population
-	,MAX(CAST((total_Cases / CAST(population AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))) AS percent_contracted
+	,MAX(CAST((total_Cases / CAST(population AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))) 
+		AS percent_pop_contracted
 FROM COVIDPortfolioProject..CovidDeaths
 WHERE total_cases > 0 AND population > 0 
 GROUP BY location, population
-ORDER BY percent_contracted DESC
+ORDER BY percent_pop_contracted DESC
 
 
---highest death count
-SELECT
-	location
-	,MAX(total_deaths) AS total_death_count
-FROM COVIDPortfolioProject..CovidDeaths
-WHERE total_deaths > 0 
-GROUP BY location
-ORDER BY total_death_count DESC
-
---death count based on continent
+--
 SELECT 
-	continent
-	,MAX(total_deaths) AS total_death_count
+	location
+	,MAX(total_cases) AS highest_infection_count
+	,population
+	,date
+	,MAX(CAST((total_Cases / CAST(population AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))) 
+		AS percent_pop_contracted
 FROM COVIDPortfolioProject..CovidDeaths
-WHERE total_deaths > 0
-	AND continent IS NOT NULL
-GROUP BY continent
-ORDER BY total_death_count DESC
-
-
---global numbers
---divide by zero error encountered
-SELECT
-	date
-	,SUM(new_cases) AS newCases
-	,SUM(new_deaths) AS newDeaths
-	,CAST((new_deaths / CAST(new_cases AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2)) 
-	AS totalDeaths
-FROM COVIDPortfolioProject..CovidDeaths
-WHERE new_cases > 0 AND new_deaths > 0
-	AND continent is not null
-GROUP BY date, new_cases, new_deaths
-ORDER BY date
+WHERE total_cases > 0 AND population > 0 
+	AND YEAR(date) = 2020
+	OR YEAR(date) = 2021
+GROUP BY location, population, date
+ORDER BY percent_pop_contracted DESC
 
 
 
---total population vs vaccination
-SELECT
-	death.continent
-	,death.location
-	,death.date
-	,death.population
-	,CAST(new_vaccinations AS DECIMAL(15,0)) AS newVaccinations
-	,SUM(CAST(vac.new_vaccinations AS DECIMAL(15,0))) 
-		OVER (PARTITION BY death.location ORDER BY death.location, death.date) 
-		AS rollingVaccinationCount
-FROM COVIDPortfolioProject..CovidDeaths death
-JOIN COVIDPortfolioProject..CovidVaccinations vac
-	ON (death.location = vac.location 
-	AND death.date = vac.date)
-WHERE population > 0 AND new_vaccinations > 0
-	AND death.continent IS NOT NULL
-ORDER BY 1, 2, 3
+
+
+--percent deaths
+--likelihood of dying if contracted COVID
+--SELECT
+--	location
+--	,SUM(total_cases) AS total_cases
+--	,SUM(total_deaths) AS total_deaths
+--	,CAST((SUM(CAST(total_deaths AS DECIMAL(15,2))) / CAST(total_cases AS DECIMAL(15, 2))) * 100 AS DECIMAL(15, 2))
+--		AS percent_deaths
+--FROM COVIDPortfolioProject..CovidDeaths
+--WHERE total_cases > 0 AND total_deaths > 0
+--	AND continent IS NULL
+--	AND location NOT IN ('World', 'Europian Union', 'International')
+--GROUP BY location, date, total_cases, total_deaths
+
+
+--total vaccination vs population
+--SELECT
+--	death.continent
+--	,death.location
+--	,death.date
+--	,death.population
+--	,CAST(new_vaccinations AS DECIMAL(15,0)) AS newVaccinations
+--	,SUM(CAST(vac.new_vaccinations AS DECIMAL(15,0))) 
+--		OVER (PARTITION BY death.location ORDER BY death.location, death.date) 
+--		AS rollingVaccinationCount
+--FROM COVIDPortfolioProject..CovidDeaths death
+--JOIN COVIDPortfolioProject..CovidVaccinations vac
+--	ON (death.location = vac.location 
+--	AND death.date = vac.date)
+--WHERE population > 0 AND new_vaccinations > 0
+--	AND death.continent IS NOT NULL
+--	AND death.location NOT IN ('World', 'Europian Union', 'International')
+
+
+
+--SELECT
+--	death.location
+--	,death.population
+--	,(SUM(CAST(death.population AS BIGINT))/SUM(CAST(people_fully_vaccinated AS BIGINT)))*100
+--		AS newVaccinations
+--FROM COVIDPortfolioProject..CovidDeaths death
+--JOIN COVIDPortfolioProject..CovidVaccinations vac
+--	ON (death.location = vac.location)
+--WHERE population > 0 AND people_fully_vaccinated > 0
+--	AND total_vaccinations < 2161206739
+--	AND death.continent IS NULL
+--	AND death.location NOT IN ('World', 'Europian Union', 'International')
+--GROUP BY death.location, death.population, people_fully_vaccinated
 
 
 --how much of the population is vaccinated
